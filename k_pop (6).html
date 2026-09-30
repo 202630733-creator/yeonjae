@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>찾아돌 (Find-a-Dol) - K-POP 아이돌 추천 & 도감</title>
+  <!-- Pretendard Font CDN -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              pink: '#ff85a2',
+              purple: '#9d4edd',
+              dark: '#1e1b2e',
+              light: '#fff0f3',
+              sub: '#f8f9fa'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --primary-pink: #ff85a2;
+      --pastel-pink: #fff0f3;
+      --primary-purple: #9d4edd;
+      --pastel-purple: #f3e8ff;
+      --pastel-blue: #e0f2fe;
+      --text-main: #2b2d42;
+      --text-sub: #6c757d;
+      --border-color: #edf2f7;
+      --shadow-soft: 0 10px 30px -5px rgba(157, 78, 221, 0.08), 0 8px 15px -6px rgba(0, 0, 0, 0.04);
+      --radius-lg: 24px;
+      --radius-md: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    }
+
+    body {
+      background-color: #fafbfc;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      align-items: center;
+    }
+
+    .view {
+      display: none;
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .view.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Dual-Layer Face Crop Protection Container */
+    .idol-img-wrapper {
+      position: relative;
+      width: 100%;
+      height: 380px;
+      background-color: #111827;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .idol-img-bg {
+      position: absolute;
+      top: -10%; left: -10%;
+      width: 120%; height: 120%;
+      object-fit: cover;
+      filter: blur(24px) brightness(0.65);
+      opacity: 0.7;
+      transform: scale(1.1);
+    }
+
+    .idol-img {
+      position: relative;
+      z-index: 2;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      transition: transform 0.3s ease;
+    }
+
+    .idol-card:hover .idol-img {
+      transform: scale(1.02);
+    }
+
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    /* Custom Toast Notification */
+    #toast-notification {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 2000;
+    }
+
+    #toast-notification.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body class="selection:bg-pink-100 selection:text-pink-600">
+
+  <!-- Header Bar -->
+  <header class="w-full max-w-4xl px-4 py-4 md:py-5 flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-gray-100 bg-white sticky top-0 z-40 shadow-sm">
+    <div class="flex items-center justify-between w-full sm:w-auto">
+      <div class="logo text-2xl font-extrabold flex items-center gap-2 cursor-pointer" onclick="switchTab('test')">
+        <span class="p-2 bg-gradient-to-tr from-pink-500 to-purple-600 text-white rounded-xl text-lg shadow-md">🔍</span>
+        <span class="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 bg-clip-text text-transparent">찾아돌</span>
+      </div>
+      <button class="sm:hidden text-xs bg-gray-100 font-semibold px-3 py-2 rounded-full hover:bg-purple-100 hover:text-purple-600" onclick="openAdminModal()">🔑 관리자</button>
+    </div>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="flex items-center gap-1 bg-gray-100/80 p-1.5 rounded-full border border-gray-200/60 w-full sm:w-auto justify-center">
+      <button id="nav-btn-test" class="px-5 py-2 rounded-full text-sm font-bold transition-all bg-white text-purple-700 shadow-sm" onclick="switchTab('test')">
+        🧪 취향 테스트
+      </button>
+      <button id="nav-btn-wiki" class="px-5 py-2 rounded-full text-sm font-bold text-gray-500 hover:text-gray-900 transition-all" onclick="switchTab('wiki')">
+        📚 아이돌 도감
+      </button>
+    </nav>
+
+    <button class="hidden sm:block text-xs bg-gray-100 font-semibold px-4 py-2.5 rounded-full hover:bg-purple-100 hover:text-purple-600 transition-colors" onclick="openAdminModal()">🔑 관리자 모드</button>
+  </header>
+
+  <!-- Main Container -->
+  <main class="w-full max-w-3xl px-4 py-6 md:py-8 flex-1">
+
+    <!-- VIEW 1: HERO (Start Quiz) -->
+    <section id="view-hero" class="view active">
+      <div class="text-center py-10 px-4">
+        <span class="inline-block bg-pink-100 text-pink-600 px-4 py-1.5 rounded-full text-xs md:text-sm font-bold mb-4 tracking-wide shadow-sm">
+          ✨ K-POP 음악 & 취향 매칭 AI
+        </span>
+        <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight mb-4 tracking-tight">
+          내 취향에 딱 맞는<br><span class="bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">최애 아이돌</span> 찾아볼래?
+        </h1>
+        <p class="text-gray-500 text-sm md:text-base mb-8 max-w-md mx-auto leading-relaxed">
+          컨셉, 음악 스타일, 외모 이상형부터 입덕 포인트까지!<br>당신의 심장을 훔칠 아이돌과 <span class="font-bold text-gray-700">대표 입문곡 2선</span>을 추천해드립니다.
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button class="w-full sm:w-auto bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-2xl text-lg shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 hover:-translate-y-0.5 transition-all cursor-pointer" onclick="startQuiz()">
+            테스트 시작하기 🚀
+          </button>
+          <button class="w-full sm:w-auto bg-white border border-gray-200 hover:border-purple-300 text-gray-700 font-bold py-4 px-6 rounded-2xl text-base hover:bg-purple-50/50 transition-all cursor-pointer" onclick="switchTab('wiki')">
+            📚 도감 둘러보기
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: QUIZ WIZARD -->
+    <section id="view-quiz" class="view">
+      <div class="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden mb-8">
+        <div id="progress-bar" class="h-full bg-gradient-to-r from-pink-500 to-purple-600 transition-all duration-300 w-0"></div>
+      </div>
+
+      <div class="mb-6">
+        <div id="step-number" class="text-xs font-extrabold text-pink-500 tracking-wider uppercase mb-1">STEP 1 / 6</div>
+        <div id="step-question" class="text-xl md:text-2xl font-bold text-gray-900 leading-snug">질문 내용을 불러오는 중...</div>
+      </div>
+
+      <div id="options-container" class="grid grid-cols-1 gap-3 mb-8"></div>
+
+      <div class="flex items-center justify-between border-t border-gray-100 pt-6">
+        <button id="btn-prev" class="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-6 py-3 rounded-xl text-sm transition-colors cursor-pointer" onclick="prevStep()">이전</button>
+        <span class="text-xs text-gray-400">선택지를 클릭하면 자동으로 넘어갑니다</span>
+      </div>
+    </section>
+
+    <!-- VIEW 3: QUIZ RESULT -->
+    <section id="view-result" class="view">
+      <div class="text-center mb-8">
+        <span class="bg-purple-100 text-purple-700 font-bold px-4 py-1.5 rounded-full text-xs shadow-sm">🎯 매칭 분석 완료</span>
+        <h2 class="text-2xl md:text-3xl font-extrabold text-gray-900 mt-2">당신만을 위한 추천 아이돌 TOP 3</h2>
+      </div>
+
+      <div id="results-container" class="space-y-6"></div>
+
+      <div class="text-center mt-10">
+        <button class="bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold px-8 py-4 rounded-2xl text-base shadow-lg hover:shadow-pink-500/30 transition-all cursor-pointer" onclick="startQuiz()">
+          다시 테스트하기 🔄
+        </button>
+      </div>
+    </section>
+
+    <!-- VIEW 4: IDOL ENCYCLOPEDIA (도감) -->
+    <section id="view-wiki" class="view">
+      <div class="mb-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-2xl font-extrabold text-gray-900">📚 아이돌 도감</h2>
+            <p class="text-xs text-gray-500 mt-0.5">전체 K-POP 라인업을 탐색하고 입문곡을 바로 들어보세요!</p>
+          </div>
+
+          <!-- Search Bar -->
+          <div class="relative w-full md:w-64">
+            <input type="text" id="wiki-search-input" placeholder="이름, 그룹, 소속사 검색..." oninput="filterWiki()" class="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-500 focus:bg-white transition-all">
+            <span class="absolute left-3 top-3 text-gray-400 text-sm">🔍</span>
+          </div>
+        </div>
+
+        <!-- Filter Tags -->
+        <div class="flex items-center gap-2 border-b border-gray-100 pb-4">
+          <button class="wiki-filter-btn px-4 py-1.5 rounded-full text-xs font-bold bg-purple-600 text-white shadow-sm" data-gender="all" onclick="setWikiFilter('all', this)">전체보기</button>
+          <button class="wiki-filter-btn px-4 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200" data-gender="female" onclick="setWikiFilter('female', this)">👩 여돌만</button>
+          <button class="wiki-filter-btn px-4 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200" data-gender="male" onclick="setWikiFilter('male', this)">👨 남돌만</button>
+        </div>
+      </div>
+
+      <!-- Encyclopedia Grid -->
+      <div id="wiki-grid" class="grid grid-cols-1 md:grid-cols-2 gap-5"></div>
+    </section>
+
+  </main>
+
+  <!-- ADMIN MODAL -->
+  <div id="admin-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100">
+      <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <div>
+          <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">🔑 프로필 사진 관리자</h3>
+          <p class="text-xs text-gray-500 mt-0.5">입력하신 사진 주소는 브라우저에 **안전하게 동기화 보존**됩니다.</p>
+        </div>
+        <button onclick="closeAdminModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 font-bold">✕</button>
+      </div>
+
+      <div id="admin-idol-list" class="p-6 overflow-y-auto custom-scrollbar space-y-4 flex-1"></div>
+
+      <div class="p-6 border-t border-gray-100 bg-gray-50/50 flex items-center gap-3">
+        <button class="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3.5 px-4 rounded-xl text-sm shadow-md transition-all cursor-pointer" onclick="saveAdminData()">
+          💾 설정 저장하기
+        </button>
+        <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3.5 px-4 rounded-xl text-sm transition-colors cursor-pointer" onclick="resetDefaultData()">
+          기본값 복원
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Toast -->
+  <div id="toast-notification" class="bg-gray-900/90 text-white text-xs font-bold px-5 py-3 rounded-full shadow-2xl backdrop-blur-md flex items-center gap-2">
+    <span id="toast-icon">✅</span>
+    <span id="toast-msg">메시지 내용</span>
+  </div>
+
+  <script>
+    // Default Idol Dataset (6 Female + 6 Male = 12 Idols)
+    // Preservation Promise: All IDs remain identical so custom admin photo URLs in localStorage 'findadol_idols' remain intact!
+    const DEFAULT_IDOLS = [
+      // 여돌 (6명)
+      {
+        id: "karina",
+        name: "카리나",
+        group: "aespa (에스파)",
+        gender: "female",
+        agency: "SM 엔터테인먼트",
+        concept: ["sexy", "girlcrush"],
+        music: ["dance", "hiphop"],
+        face: ["cat", "sharp"],
+        charm: ["skill", "gap"],
+        outfit: ["suit", "kitsch"],
+        starterSongs: [
+          { title: "Supernova", artist: "aespa" },
+          { title: "Armageddon", artist: "aespa" }
+        ],
+        meme: "AI보다 더 AI 같은 비주얼 🤖",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Aespa_Karina_%EC%B9%B4%EB%A6%AC%EB%82%90_20240618_05.png/500px-Aespa_Karina_%EC%B9%B4%EB%A6%AC%EB%82%90_20240618_05.png",
+        namu: "https://namu.wiki/w/%EC%B9%B4%EB%A6%AC%EB%82%90(aespa)"
+      },
+      {
+        id: "wonyoung",
+        name: "장원영",
+        group: "IVE (아이브)",
+        gender: "female",
+        agency: "스타쉽 엔터테인먼트",
+        concept: ["cute", "bright"],
+        music: ["pop", "easy"],
+        face: ["rabbit", "deer"],
+        charm: ["visual", "gap"],
+        outfit: ["glam", "highteen"],
+        starterSongs: [
+          { title: "ELEVEN", artist: "IVE" },
+          { title: "I AM", artist: "IVE" }
+        ],
+        meme: "원영적 사고 (럭키비키🍀)",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Jang_Won-young_of_Ive%2C_April_16%2C_2025.png/500px-Jang_Won-young_of_Ive%2C_April_16%2C_2025.png",
+        namu: "https://namu.wiki/w/%EC%9E%A5%EC%9B%90%EC%98%81"
+      },
+      {
+        id: "minji",
+        name: "민지",
+        group: "NewJeans (뉴진스)",
+        gender: "female",
+        agency: "어도어 (ADOR)",
+        concept: ["bright", "dreamy"],
+        music: ["easy", "rnb"],
+        face: ["dog", "deer"],
+        charm: ["gap", "visual"],
+        outfit: ["highteen", "kitsch"],
+        starterSongs: [
+          { title: "Hype Boy", artist: "NewJeans" },
+          { title: "Attention", artist: "NewJeans" }
+        ],
+        meme: "고전 미인 단아함 그 자체 🌿",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Minji_240903.png/500px-Minji_240903.png",
+        namu: "https://namu.wiki/w/%EB%AF%BC%EC%A7%80(NewJeans)"
+      },
+      {
+        id: "sullyoon",
+        name: "설윤",
+        group: "NMIXX (엔믹스)",
+        gender: "female",
+        agency: "JYP 엔터테인먼트",
+        concept: ["cute", "bright"],
+        music: ["dance", "pop"],
+        face: ["deer", "rabbit"],
+        charm: ["visual", "skill"],
+        outfit: ["glam", "highteen"],
+        starterSongs: [
+          { title: "DICE", artist: "NMIXX" },
+          { title: "Love Me Like This", artist: "NMIXX" }
+        ],
+        meme: "확신의 사슴상 명품 비주얼 🦌",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Sullyoon_at_Incheon_Airport_on_May_19%2C_2024.png/500px-Sullyoon_at_Incheon_Airport_on_May_19%2C_2024.png",
+        namu: "https://namu.wiki/w/%EC%84%A4%EC%9C%A4"
+      },
+      {
+        id: "yujin",
+        name: "안유진",
+        group: "IVE (아이브)",
+        gender: "female",
+        agency: "스타쉽 엔터테인먼트",
+        concept: ["bright", "girlcrush"],
+        music: ["dance", "pop"],
+        face: ["dog", "sharp"],
+        charm: ["variety", "skill"],
+        outfit: ["suit", "highteen"],
+        starterSongs: [
+          { title: "LOVE DIVE", artist: "IVE" },
+          { title: "HEYA", artist: "IVE" }
+        ],
+        meme: "맑은 눈의 광인 맑눈광 🐶",
+        img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80",
+        namu: "https://namu.wiki/w/%EC%95%88%EC%9C%A0%EC%A7%84"
+      },
+      {
+        id: "rescene_minami",
+        name: "미나미",
+        group: "RESCENE (리센느)",
+        gender: "female",
+        agency: "더뮤즈 엔터테인먼트",
+        concept: ["dreamy", "bright"],
+        music: ["easy", "pop"],
+        face: ["cat", "rabbit"],
+        charm: ["visual", "gap"],
+        outfit: ["glam", "highteen"],
+        starterSongs: [
+          { title: "Love Attack", artist: "RESCENE" },
+          { title: "UhUh", artist: "RESCENE" }
+        ],
+        meme: "향기 나는 5세대 비주얼 🌸",
+        img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&auto=format&fit=crop&q=80",
+        namu: "https://namu.wiki/w/RESCENE"
+      },
+
+      // 남돌 (6명)
+      {
+        id: "v",
+        name: "뷔 (V)",
+        group: "BTS (방탄소년단)",
+        gender: "male",
+        agency: "빅히트 뮤직",
+        concept: ["sexy", "dreamy"],
+        music: ["rnb", "easy"],
+        face: ["sharp", "cat"],
+        charm: ["visual", "gap"],
+        outfit: ["suit", "kitsch"],
+        starterSongs: [
+          { title: "Slow Dancing", artist: "V" },
+          { title: "Love Me Again", artist: "V" }
+        ],
+        meme: "세계 1위 미남 CGV 🐯",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Kim_Tae-hyung_in_September_2023_02.jpg/500px-Kim_Tae-hyung_in_September_2023_02.jpg",
+        namu: "https://namu.wiki/w/%EB%B7%94(BTS)"
+      },
+      {
+        id: "eunwoo",
+        name: "차은우",
+        group: "ASTRO (아스트로)",
+        gender: "male",
+        agency: "판타지오",
+        concept: ["bright", "cute"],
+        music: ["pop", "easy"],
+        face: ["dog", "deer"],
+        charm: ["visual", "variety"],
+        outfit: ["suit", "glam"],
+        starterSongs: [
+          { title: "Crazy Sexy Cool", artist: "ASTRO" },
+          { title: "STAY", artist: "차은우" }
+        ],
+        meme: "최최차차 (최애는 차은우) 👑",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Cha_Eun-woo_for_Dior_Sauvage_2024.jpg/500px-Cha_Eun-woo_for_Dior_Sauvage_2024.jpg",
+        namu: "https://namu.wiki/w/%EC%B0%A8%EC%9D%80%EC%9A%B0"
+      },
+      {
+        id: "wonbin",
+        name: "원빈",
+        group: "RIIZE (라이즈)",
+        gender: "male",
+        agency: "SM 엔터테인먼트",
+        concept: ["girlcrush", "sexy"],
+        music: ["dance", "hiphop"],
+        face: ["sharp", "cat"],
+        charm: ["skill", "visual"],
+        outfit: ["kitsch", "highteen"],
+        starterSongs: [
+          { title: "Get A Guitar", artist: "RIIZE" },
+          { title: "Love 119", artist: "RIIZE" }
+        ],
+        meme: "독보적 장발 센터 분위기 🎸",
+        img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80",
+        namu: "https://namu.wiki/w/%EC%9B%90%EB%B9%88(RIIZE)"
+      },
+      {
+        id: "ateez_san",
+        name: "산",
+        group: "ATEEZ (에이티즈)",
+        gender: "male",
+        agency: "KQ 엔터테인먼트",
+        concept: ["girlcrush", "sexy"],
+        music: ["hiphop", "dance"],
+        face: ["sharp", "cat"],
+        charm: ["skill", "gap"],
+        outfit: ["suit", "kitsch"],
+        starterSongs: [
+          { title: "BOUNCY", artist: "ATEEZ" },
+          { title: "WORK", artist: "ATEEZ" }
+        ],
+        meme: "무대 천재 입덕 직캠 장인 ⚡",
+        img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/San_in_June_2025.png/500px-San_in_June_2025.png",
+        namu: "https://namu.wiki/w/%EC%82%B0(ATEEZ)"
+      },
+      {
+        id: "hanbin",
+        name: "성한빈",
+        group: "ZEROBASEONE (제로베이스원)",
+        gender: "male",
+        agency: "웨이크원",
+        concept: ["bright", "cute"],
+        music: ["pop", "dance"],
+        face: ["dog", "deer"],
+        charm: ["variety", "skill"],
+        outfit: ["highteen", "glam"],
+        starterSongs: [
+          { title: "In Bloom", artist: "ZEROBASEONE" },
+          { title: "GOOD SO BAD", artist: "ZEROBASEONE" }
+        ],
+        meme: "햄찌 리더 다정한 반장님 🐹",
+        img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80",
+        namu: "https://namu.wiki/w/%EC%84%B1%ED%95%9C%EB%B9%88"
+      },
+      {
+        id: "dohoon",
+        name: "도훈",
+        group: "TWS (투어스)",
+        gender: "male",
+        agency: "플레디스 엔터테인먼트",
+        concept: ["bright", "cute"],
+        music: ["easy", "pop"],
+        face: ["dog", "rabbit"],
+        charm: ["variety", "visual"],
+        outfit: ["highteen", "kitsch"],
+        starterSongs: [
+          { title: "첫 만남은 계획대로 되지 않아", artist: "TWS" },
+          { title: "내가 S면 넌 나의 N이 되어줘", artist: "TWS" }
+        ],
+        meme: "청량 청춘물의 인간화 💙",
+        img: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=500&auto=format&fit=crop&q=80",
+        namu: "https://namu.wiki/w/TWS"
+      }
+    ];
+
+    // Questionnaire Structure (6 Questions)
+    const QUESTIONS = [
+      {
+        id: "gender",
+        question: "찾고 싶은 아이돌의 성별을 선택하세요",
+        options: [
+          { label: "여성 아이돌 (여돌)", value: "female", emoji: "👩" },
+          { label: "남성 아이돌 (남돌)", value: "male", emoji: "👨" },
+          { label: "성별 상관 없음!", value: "all", emoji: "✨" }
+        ]
+      },
+      {
+        id: "concept",
+        question: "어떤 느낌의 무대 컨셉을 선호하시나요?",
+        options: [
+          { label: "청량하고 상큼발랄한 스타일", value: "bright", emoji: "🍋" },
+          { label: "사랑스럽고 큐티한 스타일", value: "cute", emoji: "🎀" },
+          { label: "시크하고 힙한 걸크러쉬/카리스마", value: "girlcrush", emoji: "🔥" },
+          { label: "치명적이고 고혹적인 섹시 스타일", value: "sexy", emoji: "💋" },
+          { label: "감성적이고 몽환적인 스타일", value: "dreamy", emoji: "🌙" }
+        ]
+      },
+      {
+        id: "music",
+        question: "즐겨 듣는 대표 노래 스타일은 무엇인가요?",
+        options: [
+          { label: "듣기 편안한 이지리스닝 / 팝", value: "easy", emoji: "🎧" },
+          { label: "신나는 중독성 강한 댄스곡", value: "dance", emoji: "💃" },
+          { label: "감성 터지는 몽환 / R&B", value: "rnb", emoji: "🎵" },
+          { label: "강렬한 비트의 힙합 / EDM", value: "hiphop", emoji: "⚡" }
+        ]
+      },
+      {
+        id: "face",
+        question: "가장 끌리는 외모 이상형(얼굴상)은?",
+        options: [
+          { label: "시크하고 차가운 고양이상", value: "cat", emoji: "🐱" },
+          { label: "순둥하고 멍뭉미 넘치는 강아지상", value: "dog", emoji: "🐶" },
+          { label: "청순하고 사슴 / 토끼상", value: "deer", emoji: "🐰" },
+          { label: "샤프하고 날티/공룡상 카리스마", value: "sharp", emoji: "🦖" }
+        ]
+      },
+      {
+        id: "charm",
+        question: "당신의 심장을 제대로 스나이핑할 입덕 포인트는?",
+        options: [
+          { label: "무대를 찢어놓는 보컬 & 댄스 실력파", value: "skill", emoji: "🎤" },
+          { label: "무대 밖 댕댕미 넘치는 반전 갭모에", value: "gap", emoji: "✨" },
+          { label: "화면을 뚫고 나오는 압도적 비주얼 천재", value: "visual", emoji: "💎" },
+          { label: "예능감 만렙! 다정하고 귀여운 소통왕", value: "variety", emoji: "🥰" }
+        ]
+      },
+      {
+        id: "outfit",
+        question: "무대 위에서 보았을 때 가장 빛나는 착장은?",
+        options: [
+          { label: "스포티 & 프레피 하이틴 룩", value: "highteen", emoji: "🎒" },
+          { label: "세련되고 시크한 수트 & 슬림 핏", value: "suit", emoji: "👔" },
+          { label: "화려하고 로맨틱한 공주/프린스 룩", value: "glam", emoji: "👑" },
+          { label: "키치하고 힙한 Y2K 스트릿 룩", value: "kitsch", emoji: "🎨" }
+        ]
+      }
+    ];
+
+    // State Variables
+    let idols = [];
+    let currentStep = 0;
+    let userAnswers = {};
+    let activeWikiGender = 'all';
+
+    // Smart Merge Initialization: Never erases user-edited photos in localStorage!
+    function initApp() {
+      const saved = localStorage.getItem("findadol_idols");
+      if (saved) {
+        try {
+          const savedList = JSON.parse(saved);
+          const savedMap = {};
+          savedList.forEach(item => {
+            if (item.id && item.img) savedMap[item.id] = item.img;
+          });
+
+          // Match default dataset with user-customized photos
+          idols = DEFAULT_IDOLS.map(def => {
+            if (savedMap[def.id]) {
+              return { ...def, img: savedMap[def.id] };
+            }
+            return def;
+          });
+        } catch (e) {
+          idols = [...DEFAULT_IDOLS];
+        }
+      } else {
+        idols = [...DEFAULT_IDOLS];
+      }
+
+      renderWikiGrid();
+    }
+
+    function switchTab(tabName) {
+      const navTest = document.getElementById("nav-btn-test");
+      const navWiki = document.getElementById("nav-btn-wiki");
+
+      if (tabName === 'test') {
+        navTest.className = "px-5 py-2 rounded-full text-sm font-bold transition-all bg-white text-purple-700 shadow-sm";
+        navWiki.className = "px-5 py-2 rounded-full text-sm font-bold text-gray-500 hover:text-gray-900 transition-all";
+        showView(currentStep > 0 ? "view-quiz" : "view-hero");
+      } else if (tabName === 'wiki') {
+        navWiki.className = "px-5 py-2 rounded-full text-sm font-bold transition-all bg-white text-purple-700 shadow-sm";
+        navTest.className = "px-5 py-2 rounded-full text-sm font-bold text-gray-500 hover:text-gray-900 transition-all";
+        showView("view-wiki");
+        renderWikiGrid();
+      }
+    }
+
+    function showView(viewId) {
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+      document.getElementById(viewId).classList.add("active");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function startQuiz() {
+      currentStep = 0;
+      userAnswers = {};
+      showView("view-quiz");
+      renderStep();
+    }
+
+    function renderStep() {
+      const q = QUESTIONS[currentStep];
+      document.getElementById("progress-bar").style.width = `${((currentStep + 1) / QUESTIONS.length) * 100}%`;
+      document.getElementById("step-number").innerText = `STEP ${currentStep + 1} / ${QUESTIONS.length}`;
+      document.getElementById("step-question").innerText = q.question;
+
+      const container = document.getElementById("options-container");
+      container.innerHTML = "";
+
+      q.options.forEach(opt => {
+        const isSelected = userAnswers[q.id] === opt.value;
+        const btn = document.createElement("button");
+        btn.className = `w-full text-left p-4 md:p-5 rounded-2xl border-2 transition-all flex items-center justify-between cursor-pointer ${
+          isSelected 
+            ? 'border-purple-600 bg-purple-50 text-purple-900 font-bold shadow-sm' 
+            : 'border-gray-100 bg-white hover:border-pink-300 hover:bg-pink-50/50 text-gray-800'
+        }`;
+        btn.onclick = () => selectOption(q.id, opt.value);
+        btn.innerHTML = `
+          <span class="text-base font-semibold">${opt.label}</span>
+          <span class="text-2xl">${opt.emoji}</span>
+        `;
+        container.appendChild(btn);
+      });
+
+      document.getElementById("btn-prev").style.visibility = currentStep === 0 ? "hidden" : "visible";
+    }
+
+    function selectOption(key, val) {
+      userAnswers[key] = val;
+      if (currentStep < QUESTIONS.length - 1) {
+        currentStep++;
+        renderStep();
+      } else {
+        calculateResult();
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 0) {
+        currentStep--;
+        renderStep();
+      }
+    }
+
+    function calculateResult() {
+      let pool = idols;
+      if (userAnswers.gender && userAnswers.gender !== "all") {
+        pool = pool.filter(i => i.gender === userAnswers.gender);
+      }
+
+      const scored = pool.map(idol => {
+        let score = 0;
+        if (idol.concept.includes(userAnswers.concept)) score += 30;
+        if (idol.music.includes(userAnswers.music)) score += 25;
+        if (idol.face.includes(userAnswers.face)) score += 25;
+        if (idol.charm.includes(userAnswers.charm)) score += 10;
+        if (idol.outfit.includes(userAnswers.outfit)) score += 10;
+        
+        const matchPercent = Math.min(99, Math.max(72, score + Math.floor(Math.random() * 5)));
+        return { ...idol, matchPercent };
+      });
+
+      scored.sort((a, b) => b.matchPercent - a.matchPercent);
+      const top3 = scored.slice(0, 3);
+      renderResults(top3);
+      showView("view-result");
+    }
+
+    function renderResults(list) {
+      const container = document.getElementById("results-container");
+      container.innerHTML = "";
+
+      if (list.length === 0) {
+        container.innerHTML = `<p class="text-center py-12 text-gray-500 font-bold">조건에 일치하는 아이돌이 없습니다 😢</p>`;
+        return;
+      }
+
+      list.forEach((idol, idx) => {
+        const rankBadges = [
+          { text: "🥇 1위 (최고 매칭)", bg: "bg-amber-100 text-amber-800" },
+          { text: "🥈 2위 추천", bg: "bg-slate-100 text-slate-700" },
+          { text: "🥉 3위 추천", bg: "bg-orange-100 text-orange-800" }
+        ];
+
+        const card = document.createElement("div");
+        card.className = `idol-card bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden ${idx === 0 ? 'ring-2 ring-pink-400' : ''}`;
+        
+        card.innerHTML = `
+          <!-- Dual-layer face crop protection wrapper -->
+          <div class="idol-img-wrapper">
+            <img class="idol-img-bg" src="${idol.img}" alt="${idol.name}">
+            <img class="idol-img" src="${idol.img}" alt="${idol.name}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/500x500/1a1a2e/ffffff?text=${encodeURIComponent(idol.name)}'">
+            <div class="match-percent-tag">${idol.matchPercent}% 매칭</div>
+          </div>
+
+          <div class="p-6">
+            <span class="inline-block px-3 py-1 rounded-lg text-xs font-black mb-3 ${rankBadges[idx].bg}">
+              ${rankBadges[idx].text}
+            </span>
+
+            <div class="flex flex-col mb-3">
+              <h3 class="text-2xl font-black text-gray-900">${idol.name}</h3>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="px-2.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-md">🏷️ ${idol.group}</span>
+                <span class="text-xs text-gray-500 font-medium">🏢 ${idol.agency}</span>
+              </div>
+            </div>
+
+            <div class="inline-block px-3 py-1.5 bg-pink-50 text-pink-600 rounded-xl text-xs font-extrabold mb-5">
+              ${idol.meme}
+            </div>
+
+            <!-- 2 Starter Songs with Direct Listen Button -->
+            <div class="bg-gradient-to-br from-slate-50 to-purple-50/40 rounded-2xl p-4 border border-purple-100/60 mb-5">
+              <div class="text-xs font-bold text-purple-900 mb-2.5 flex items-center gap-1.5">
+                <span>🎧</span> 입문 대표 곡 (2선)
+              </div>
+              <div class="space-y-2">
+                ${idol.starterSongs.map(song => `
+                  <div class="bg-white/80 backdrop-blur-sm p-3 rounded-xl border border-gray-100 flex items-center justify-between hover:bg-white transition-colors">
+                    <div class="truncate mr-2">
+                      <div class="text-xs font-bold text-gray-800 truncate">${song.title}</div>
+                      <div class="text-[11px] text-gray-400 truncate">${song.artist}</div>
+                    </div>
+                    <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(song.title + ' ' + song.artist)}" target="_blank" class="shrink-0 bg-red-500 hover:bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition-all">
+                      <span>▶</span> 바로듣기
+                    </a>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Action Links -->
+            <div class="grid grid-cols-2 gap-2">
+              <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(idol.name + ' ' + idol.group + ' 직캠')}" target="_blank" class="text-center bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-3 rounded-xl transition-all">
+                📹 레전드 직캠
+              </a>
+              <a href="${idol.namu}" target="_blank" class="text-center bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-3 rounded-xl transition-all">
+                📖 나무위키 프로필
+              </a>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function setWikiFilter(gender, btn) {
+      activeWikiGender = gender;
+      document.querySelectorAll(".wiki-filter-btn").forEach(b => {
+        b.className = "wiki-filter-btn px-4 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200";
+      });
+      btn.className = "wiki-filter-btn px-4 py-1.5 rounded-full text-xs font-bold bg-purple-600 text-white shadow-sm";
+      renderWikiGrid();
+    }
+
+    function filterWiki() {
+      renderWikiGrid();
+    }
+
+    function renderWikiGrid() {
+      const grid = document.getElementById("wiki-grid");
+      if (!grid) return;
+
+      const query = (document.getElementById("wiki-search-input")?.value || "").toLowerCase().trim();
+
+      let filtered = idols.filter(idol => {
+        const matchesGender = activeWikiGender === 'all' || idol.gender === activeWikiGender;
+        const matchesQuery = !query || 
+          idol.name.toLowerCase().includes(query) || 
+          idol.group.toLowerCase().includes(query) || 
+          idol.agency.toLowerCase().includes(query);
+        return matchesGender && matchesQuery;
+      });
+
+      grid.innerHTML = "";
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400 font-bold">검색 결과가 없습니다 🔍</div>`;
+        return;
+      }
+
+      filtered.forEach(idol => {
+        const card = document.createElement("div");
+        card.className = "idol-card bg-white rounded-3xl border border-gray-100 shadow-md overflow-hidden flex flex-col justify-between";
+        
+        card.innerHTML = `
+          <div>
+            <div class="idol-img-wrapper" style="height: 280px;">
+              <img class="idol-img-bg" src="${idol.img}">
+              <img class="idol-img" src="${idol.img}" alt="${idol.name}" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/400x400/1a1a2e/ffffff?text=${encodeURIComponent(idol.name)}'">
+            </div>
+
+            <div class="p-5">
+              <div class="flex items-center justify-between mb-1">
+                <h3 class="text-xl font-extrabold text-gray-900">${idol.name}</h3>
+                <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md font-bold">${idol.gender === 'female' ? '👩 여돌' : '👨 남돌'}</span>
+              </div>
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md">🏷️ ${idol.group}</span>
+                <span class="text-xs text-gray-400">🏢 ${idol.agency}</span>
+              </div>
+
+              <p class="text-xs font-bold text-pink-600 bg-pink-50 p-2 rounded-lg mb-4">${idol.meme}</p>
+
+              <!-- 2 Starter Songs -->
+              <div class="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-2 mb-4">
+                <div class="text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">🎧 입문 추천곡 2선</div>
+                ${idol.starterSongs.map(song => `
+                  <div class="flex items-center justify-between text-xs bg-white p-2 rounded-lg border border-gray-100">
+                    <span class="font-bold text-gray-800 truncate mr-2">${song.title}</span>
+                    <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(song.title + ' ' + song.artist)}" target="_blank" class="shrink-0 bg-red-500 hover:bg-red-600 text-white font-bold px-2 py-1 rounded text-[10px]">
+                      ▶ 바로듣기
+                    </a>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="p-5 pt-0 grid grid-cols-2 gap-2">
+            <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(idol.name + ' ' + idol.group + ' 직캠')}" target="_blank" class="text-center bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold py-2.5 rounded-xl transition-all">
+              📹 레전드 직캠
+            </a>
+            <a href="${idol.namu}" target="_blank" class="text-center bg-teal-50 text-teal-700 hover:bg-teal-100 text-xs font-bold py-2.5 rounded-xl transition-all">
+              📖 나무위키 Profile
+            </a>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function openAdminModal() {
+      const container = document.getElementById("admin-idol-list");
+      container.innerHTML = "";
+
+      idols.forEach(idol => {
+        const item = document.createElement("div");
+        item.className = "flex items-center gap-3 p-3 bg-gray-50 rounded-2xl border border-gray-100";
+        item.innerHTML = `
+          <img class="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0" src="${idol.img}" onerror="this.src='https://placehold.co/100x100/1a1a2e/ffffff?text=X'">
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-bold text-gray-900 truncate mb-1">${idol.name} (${idol.group})</div>
+            <input type="text" id="admin-img-${idol.id}" value="${idol.img}" placeholder="사진 이미지 URL 주소" class="w-full text-xs px-3 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500">
+          </div>
+        `;
+        container.appendChild(item);
+      });
+
+      document.getElementById("admin-modal").classList.remove("hidden");
+      document.getElementById("admin-modal").classList.add("flex");
+    }
+
+    function closeAdminModal() {
+      document.getElementById("admin-modal").classList.add("hidden");
+      document.getElementById("admin-modal").classList.remove("flex");
+    }
+
+    function saveAdminData() {
+      idols.forEach(idol => {
+        const input = document.getElementById(`admin-img-${idol.id}`);
+        if (input) {
+          idol.img = input.value.trim();
+        }
+      });
+
+      localStorage.setItem("findadol_idols", JSON.stringify(idols));
+      showToast("입력하신 사진 주소가 안전하게 보존되었습니다! 💾");
+      closeAdminModal();
+      renderWikiGrid();
+      if (document.getElementById("view-result").classList.contains("active")) {
+        calculateResult();
+      }
+    }
+
+    function resetDefaultData() {
+      localStorage.removeItem("findadol_idols");
+      idols = DEFAULT_IDOLS.map(d => ({ ...d }));
+      showToast("기본 이미지 주소로 복원되었습니다.");
+      openAdminModal();
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast-notification");
+      document.getElementById("toast-msg").innerText = msg;
+      toast.classList.add("show");
+      setTimeout(() => {
+        toast.classList.remove("show");
+      }, 3000);
+    }
+
+    // App Initialize
+    window.onload = function() {
+      initApp();
+    };
+  </script>
+</body>
+</html>
